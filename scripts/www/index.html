@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <!-- 强制竖屏，禁止缩放，移动端适配，HBuilderX打包apk关键meta -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="screen-orientation" content="portrait">
+    <meta name="x5-orientation" content="portrait">
+    <title>命理生活本</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        html, body {
+            height: 100%;
+            overflow: hidden;
+            /* 米白色背景 */
+            background-color: #f8f6f0;
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+            font-size: 15px;
+            color: #333333;
+        }
+        #app {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+        }
+        /* 页面容器，内容滚动区域 */
+        .page-wrap {
+            flex: 1;
+            overflow-y: auto;
+            padding: 16px;
+            padding-bottom: 80px;
+        }
+        .page {
+            display: none;
+        }
+        .page.active {
+            display: block;
+        }
+        /* 底部Tab导航固定 */
+        .tab-bar {
+            height: 64px;
+            flex-shrink: 0;
+            display: flex;
+            background: #ffffff;
+            border-top: 1px solid #e2e0db;
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+        }
+        .tab-item {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            font-size: 12px;
+            color: #777777;
+        }
+        .tab-item.active {
+            color: #a894bc; /*莫兰迪浅紫高亮*/
+        }
+        .tab-icon {
+            font-size: 20px;
+            margin-bottom: 3px;
+        }
+        /* 表单组件 */
+        input, textarea, select {
+            width: 100%;
+            border: 1px solid #d8d4cd;
+            border-radius: 8px;
+            padding: 12px;
+            background: #fff;
+            font-size: 15px;
+            margin: 8px 0;
+        }
+        textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        button {
+            padding: 11px 16px;
+            border-radius: 8px;
+            border: none;
+            font-size:15px;
+            margin:6px 3px;
+        }
+        .btn-primary {
+            background-color: #a894bc;
+            color:#fff;
+        }
+        .btn-normal {
+            background:#e9e6df;
+            color:#333;
+        }
+        .btn-danger {
+            background:#e7caca;
+            color:#992c2c;
+        }
+        .block-card {
+            background:#ffffff;
+            border-radius:10px;
+            padding:14px;
+            margin:10px 0;
+        }
+        .title-h3 {
+            font-size:17px;
+            font-weight:600;
+            margin:8px 0 12px;
+        }
+        .tip-text {
+            font-size:13px;
+            color:#888;
+            margin:4px 0;
+        }
+        .list-item {
+            padding:12px;
+            background:#fff;
+            border-radius:8px;
+            margin:7px 0;
+        }
+    </style>
+</head>
+<body>
+<div id="app">
+    <div class="page-wrap">
+        <!-- Tab1 首页 【默认激活】 内部固定癸水日主，无任何日主修改控件 -->
+        <div class="page active" id="page-home">
+            <div class="block-card">
+                <div class="title-h3">今日信息</div>
+                <div id="home-date-info"></div>
+            </div>
+            <div class="block-card">
+                <div class="title-h3">今日运势（癸水日主）</div>
+                <div id="luck-info"></div>
+            </div>
+            <div class="block-card">
+                <div class="title-h3">今日心情记录</div>
+                <textarea id="home-mood" placeholder="写下今日简短心情..."></textarea>
+                <button class="btn-primary" onclick="saveHomeMood()">手动保存</button>
+                <div class="tip-text">提示：清除缓存会丢失所有本地数据</div>
+            </div>
+        </div>
+
+        <!-- Tab2 随笔备忘录 -->
+        <div class="page" id="page-note">
+            <div class="title-h3">随笔备忘录</div>
+            <button class="btn-primary" onclick="noteNew()">新建随笔</button>
+            <div id="note-list-wrap"></div>
+            <!-- 编辑弹窗区域 -->
+            <div id="note-edit-area" style="display:none;">
+                <div class="block-card">
+                    <input id="note-title" placeholder="随笔标题">
+                    <textarea id="note-body" placeholder="正文内容..."></textarea>
+                    <input type="hidden" id="note-edit-id">
+                    <button class="btn-primary" onclick="noteSave()">手动保存</button>
+                    <button class="btn-normal" onclick="noteCancel()">取消</button>
+                    <button class="btn-danger" onclick="noteDelete()">删除本条</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tab3 记账 -->
+        <div class="page" id="page-bill">
+            <div class="block-card">
+                <div class="title-h3">本月预算池子</div>
+                <div id="bill-budget-view"></div>
+                <div class="tip-text">刚需预算：500｜爱好非刚需：1000｜还款预留自主记录</div>
+            </div>
+            <div class="block-card">
+                <div class="title-h3">录入收入支出</div>
+                <select id="bill-type">
+                    <option value="income">工资收入</option>
+                    <option value="pay">支出</option>
+                </select>
+                <select id="bill-account">
+                    <option value="wx">微信</option>
+                    <option value="ali">支付宝</option>
+                </select>
+                <select id="bill-pool">
+                    <option value="must">刚需500</option>
+                    <option value="hobby">爱好1000</option>
+                    <option value="repay">还款预留</option>
+                </select>
+                <input type="number" id="bill-money" placeholder="金额">
+                <input id="bill-desc" placeholder="备注说明">
+                <button class="btn-primary" onclick="billAdd()">手动保存记账</button>
+            </div>
+            <div class="block-card">
+                <div class="title-h3">本月账单列表</div>
+                <div id="bill-list"></div>
+            </div>
+        </div>
+
+        <!-- Tab4 完成记录 成果归档 -->
+        <div class="page" id="page-record">
+            <div class="title-h3">完成记录 · 成果归档</div>
+            <button class="btn-primary" onclick="recordNew()">新增归档记录</button>
+            <div class="block-card">
+                <div>自定义标签(逗号分隔)</div>
+                <input id="record-tag-input" placeholder="例：读书,写作">
+                <button class="btn-normal" onclick="recordSaveTag()">保存标签</button>
+                <div id="record-tag-show"></div>
+            </div>
+            <div id="record-edit-area" style="display:none;">
+                <div class="block-card">
+                    <input id="record-date" type="date">
+                    <input id="record-title" placeholder="标题">
+                    <select id="record-tag-select"></select>
+                    <textarea id="record-feel" placeholder="感想"></textarea>
+                    <input type="hidden" id="record-edit-id">
+                    <button class="btn-primary" onclick="recordSave()">手动保存</button>
+                    <button class="btn-normal" onclick="recordCancel()">取消</button>
+                    <button class="btn-danger" onclick="recordDel()">删除</button>
+                </div>
+            </div>
+            <div id="record-list-wrap"></div>
+        </div>
+
+        <!-- Tab5 日历&生辰八字 -->
+        <div class="page" id="page-bazi">
+            <div class="block-card">
+                <div class="title-h3">简易日历事件标记</div>
+                <input type="date" id="cal-date">
+                <input id="cal-event" placeholder="事件：排班/生日/体检">
+                <button class="btn-primary" onclick="calAddEvent()">保存事件</button>
+                <div id="cal-event-list"></div>
+                <div class="tip-text">无推送提醒，仅本地查阅</div>
+            </div>
+            <div class="block-card">
+                <div class="title-h3">生辰八字离线计算</div>
+                <input type="date" id="bazi-birthday">
+                <select id="bazi-hour">
+                    <option value="0">子时 23‑1点</option>
+                    <option value="1">丑时 1‑3点</option>
+                    <option value="2">寅时 3‑5点</option>
+                    <option value="3">卯时 5‑7点</option>
+                    <option value="4">辰时 7‑9点</option>
+                    <option value="5">巳时 9‑11点</option>
+                    <option value="6">午时 11‑13点</option>
+                    <option value="7">未时 13‑15点</option>
+                    <option value="8">申时 15‑17点</option>
+                    <option value="9">酉时 17‑19点</option>
+                    <option value="10">戌时 19‑21点</option>
+                    <option value="11">亥时 21‑23点</option>
+                </select>
+                <button class="btn-primary" onclick="calcBaZi()">计算八字五行</button>
+                <div id="bazi-result"></div>
+            </div>
+        </div>
+    </div>
+
+    <!--底部Tab导航-->
+    <div class="tab-bar">
+        <div class="tab-item" onclick="switchTab(0)">
+            <div class="tab-icon">📝</div>
+            <span>随笔</span>
+        </div>
+        <div class="tab-item" onclick="switchTab(1)">
+            <div class="tab-icon">💰</div>
+            <span>记账</span>
+        </div>
+        <div class="tab-item active" onclick="switchTab(2)">
+            <div class="tab-icon">🏠</div>
+            <span>首页</span>
+        </div>
+        <div class="tab-item" onclick="switchTab(3)">
+            <div class="tab-icon">✅</div>
+            <span>完成记录</span>
+        </div>
+        <div class="tab-item" onclick="switchTab(4)">
+            <div class="tab-icon">📅</div>
+            <span>八字日历</span>
+        </div>
+    </div>
+</div>
+
+<script>
+/**
+ * 全部数据key localStorage，离线运行，无网络请求
+ * storage keys:
+ * homeMood, noteList, billData, recordList, recordTags, calEventList
+ * 【重要变更】首页运势逻辑内部固定为癸水日主，页面无任何日主输入/选择控件，用户不可修改日主
+ **/
+const TAB_PAGE_IDS = ['page-note','page-bill','page-home','page-record','page-bazi'];
+// 切换tab
+function switchTab(idx){
+    //清除所有active
+    document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+    document.querySelectorAll('.tab-item').forEach(t=>t.classList.remove('active'));
+    document.getElementById(TAB_PAGE_IDS[idx]).classList.add('active');
+    document.querySelectorAll('.tab-item')[idx].classList.add('active');
+    //页面切换刷新渲染
+    if(idx===0) renderNoteList();
+    if(idx===1) renderBill();
+    if(idx===2) renderHome();
+    if(idx===3) renderRecordList();
+    if(idx===4) renderCalEvent();
+}
+
+// ====================== 工具函数 本地存储 ======================
+function storageGet(key){
+    const s = localStorage.getItem(key);
+    if(!s) return null;
+    try { return JSON.parse(s); }catch(e){return null;}
+}
+function storageSet(key,obj){
+    localStorage.setItem(key, JSON.stringify(obj));
+}
+
+// ===================== Tab1 首页：公历农历干支运势【内部固定癸水日主，无用户修改入口】 =====================
+const Gan = ["甲","乙","丙","丁","戊","己","庚","辛","壬","癸"];
+const Zhi = ["子","丑","寅","卯","辰","巳","午","未","申","酉","戌","亥"];
+const WuXingMap = {
+    "甲":"木","乙":"木","丙":"火","丁":"火","戊":"土","己":"土",
+    "庚":"金","辛":"金","壬":"水","癸":"水",
+    "子":"水","丑":"土","寅":"木","卯":"木","辰":"土","巳":"火",
+    "午":"火","未":"土","申":"金","酉":"金","戌":"土","亥":"水"
+};
+//简易日干支偏移（简化版离线运算，仅供参考）
+function getDayGanZhi(date){
+    const baseDate = new Date('2024-01-01');
+    const diffDay = Math.floor((date.getTime() - baseDate.getTime())/(1000*3600*24));
+    const gIdx = (8 + diffDay) %10;
+    const zIdx = (0 + diffDay) %12;
+    return {gan:Gan[(gIdx+10)%10], zhi:Zhi[(zIdx+12)%12]};
+}
+//简易农历月（简化）流月五行
+function getMonthWuXing(m){
+    const map = {1:"木",2:"木",3:"土",4:"火",5:"火",6:"土",7:"金",8:"金",9:"土",10:"水",11:"水",12:"土"};
+    return map[m];
+}
+
+/**
+ * 【固定写死：癸水日主运势模板】
+ * 内部逻辑全部针对癸水日主，页面没有任何日主选择输入控件，用户不能修改
+ */
+function buildLuckForGuiShui(dayGanZhi, monthWx){
+    //癸水日主专属素材库
+    const luckScorePool = [62,66,70,73,77,81,84,68,75];
+    const luckyColorsPool = ["浅灰蓝","雾紫","墨灰","米白","浅鸦青"];
+    const wearListPool = [
+        "低饱和冷调色系，剪裁宽松利落，忌大面积浓烈艳色",
+        "素雅沉静风格，棉垂面料，减少繁复装饰",
+        "清冷简约穿搭，中性色调为主，柔和质感更佳"
+    ];
+    const foodPool = ["牛肉","鸡肉","猪里脊","菌菇汤","豆制品"];
+    const suitableThings = [
+        "梳理账务、复盘计划，向内沉淀思考",
+        "安静阅读，整理归档过往记录，少参与纷争场合",
+        "适度休养，不必强行向外奔波，适合独处自省",
+        "处理文书笔记，梳理思绪，稳步推进手头事务"
+    ];
+    const score = luckScorePool[Math.floor(Math.random()*luckScorePool.length)];
+    const color = luckyColorsPool[Math.floor(Math.random()*luckyColorsPool.length)];
+    const wear = wearListPool[Math.floor(Math.random()*wearListPool.length)];
+    const food = foodPool[Math.floor(Math.random()*foodPool.length)];
+    return {
+        score: score,
+        color: color,
+        wear: wear,
+        food: food,
+        doThing: suitableThings
+    }
+}
+
+//首页渲染
+function renderHome(){
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth()+1;
+    const d = now.getDate();
+    const dz = getDayGanZhi(now);
+    const monthWx = getMonthWuXing(m);
+    //强制调用癸水日主运势生成函数，无外部传入日主参数
+    const luck = buildLuckForGuiShui(dz, monthWx);
+    const htmlDate = `
+公历：${y}年${m}月${d}日<br>
+当日干支：${dz.gan}${dz.zhi}<br>
+流月五行：${monthWx}<br>
+<span class="tip-text">本页固定：癸水日主</span>
+    `;
+    document.getElementById('home-date-info').innerHTML = htmlDate;
+    const htmlLuck = `
+运气指数：${luck.score}分<br>
+幸运色：${luck.color}<br>
+穿搭建议：${luck.wear}<br>
+适合吃：${luck.food}<br>
+适宜做：${luck.doThing.join("、")}
+    `;
+    document.getElementById('luck-info').innerHTML = htmlLuck;
+    //加载心情
+    const mood = storageGet("homeMood")||"";
+    document.getElementById('home-mood').value = mood;
+}
+function saveHomeMood(){
+    const val = document.getElementById('home-mood').value;
+    storageSet("homeMood",val);
+    alert("心情已手动保存到本地");
+}
+
+// ===================== Tab2 随笔备忘录 =====================
+let noteEditId = null;
+function getNoteList(){
+    return storageGet("noteList") || [];
+}
+function renderNoteList(){
+    const list = getNoteList();
+    let html = "";
+    list.forEach((item,idx)=>{
+        html += `<div class="list-item" onclick="noteEdit(${idx})">【${item.title||"无标题"}】<br><span class="tip-text">${(item.body||"").substring(0,35)}…</span></div>`
+    })
+    document.getElementById('note-list-wrap').innerHTML = html||'<div class="tip-text">暂无随笔，点击新建</div>';
+    document.getElementById('note-edit-area').style.display = 'none';
+}
+function noteNew(){
+    noteEditId = null;
+    document.getElementById('note-title').value="";
+    document.getElementById('note-body').value="";
+    document.getElementById('note-edit-id').value="";
+    document.getElementById('note-edit-area').style.display='block';
+}
+function noteEdit(idx){
+    const list = getNoteList();
+    noteEditId = idx;
+    const data = list[idx];
+    document.getElementById('note-title').value = data.title||"";
+    document.getElementById('note-body').value = data.body||"";
+    document.getElementById('note-edit-id').value = idx;
+    document.getElementById('note-edit-area').style.display='block';
+}
+function noteSave(){
+    const t = document.getElementById('note-title').value.trim();
+    const b = document.getElementById('note-body').value;
+    const arr = getNoteList();
+    if(noteEditId===null){
+        arr.push({title:t, body:b})
+    }else{
+        arr[noteEditId] = {title:t, body:b};
+    }
+    storageSet("noteList",arr);
+    alert("随笔手动保存成功");
+    renderNoteList();
+}
+function noteCancel(){
+    document.getElementById('note-edit-area').style.display='none';
+}
+function noteDelete(){
+    if(!confirm("确定删除这条随笔？删除不可恢复")) return;
+    const arr = getNoteList();
+    if(noteEditId!==null){
+        arr.splice(noteEditId,1);
+        storageSet("noteList",arr);
+    }
+    renderNoteList();
+}
+
+// ===================== Tab3 记账模块 =====================
+const BUDGET_MUST = 500;
+const BUDGET_HOBBY = 1000;
+function getBillData(){
+    return storageGet("billData")||{list:[]};
+}
+function renderBill(){
+    const bill = getBillData();
+    const now = new Date();
+    const curY = now.getFullYear();
+    const curM = now.getMonth();
+    //筛选本月记录
+    const monthList = bill.list.filter(item=>{
+        const dt = new Date(item.time);
+        return dt.getFullYear()===curY && dt.getMonth()===curM;
+    })
+    let totalPay = 0;
+    let usedMust =0;
+    let usedHobby=0;
+    let incomeSum=0;
+    monthList.forEach(i=>{
+        if(i.type==="income") incomeSum += Number(i.money);
+        else {
+            totalPay += Number(i.money);
+            if(i.pool==="must") usedMust += Number(i.money);
+            if(i.pool==="hobby") usedHobby += Number(i.money);
+        }
+    })
+    const leftMust = BUDGET_MUST - usedMust;
+    const leftHobby = BUDGET_HOBBY - usedHobby;
+    document.getElementById("bill-budget-view").innerHTML = `
+本月工资收入合计：${incomeSum.toFixed(2)}元<br>
+本月总支出：${totalPay.toFixed(2)}元<br>
+刚需预算剩余：${leftMust.toFixed(2)}元 (上限${BUDGET_MUST})<br>
+爱好非刚需剩余：${leftHobby.toFixed(2)}元 (上限${BUDGET_HOBBY})
+    `;
+    let listHtml = "";
+    monthList.reverse().forEach(bi=>{
+        const tp = bi.type==='income'?"【收入】":"【支出】";
+        listHtml += `<div class="list-item">${tp} ${bi.money}元｜${bi.account}｜池子:${bi.pool}｜备注:${bi.desc||''}<br><span class="tip-text">${bi.time}</span></div>`
+    })
+    document.getElementById("bill-list").innerHTML = listHtml || "<div class='tip-text'>本月暂无记账记录</div>";
+}
+function billAdd(){
+    const bill = getBillData();
+    const type = document.getElementById('bill-type').value;
+    const account = document.getElementById('bill-account').value;
+    const pool = document.getElementById('bill-pool').value;
+    const money = parseFloat(document.getElementById('bill-money').value);
+    const desc = document.getElementById('bill-desc').value;
+    if(isNaN(money) || money<=0){
+        alert("请输入合法金额");
+        return;
+    }
+    bill.list.push({
+        type, account, pool, money, desc, time:new Date().toLocaleString()
+    })
+    storageSet("billData",bill);
+    alert("记账手动保存成功");
+    renderBill();
+    document.getElementById('bill-money').value="";
+    document.getElementById('bill-desc').value="";
+}
+
+// ===================== Tab4 完成记录归档 =====================
+let recEditId=null;
+function getRecordList(){ return storageGet("recordList")||[]; }
+function getRecordTags(){ return storageGet("recordTags")||[]; }
+function renderRecordList(){
+    const list = getRecordList();
+    const tags = getRecordTags();
+    //渲染标签选择
+    let selOpt = `<option value="">无标签</option>`;
+    tags.forEach(t=> selOpt += `<option value="${t}">${t}</option>`);
+    document.getElementById("record-tag-select").innerHTML = selOpt;
+    document.getElementById("record-tag-show").innerText = "已定义标签："+(tags.length>0?tags.join(" / "):"暂无自定义标签");
+    document.getElementById('record-edit-area').style.display="none";
+    let html = "";
+    list.slice().reverse().forEach((item,idx)=>{
+        html += `<div class="list-item" onclick="recordEdit(${list.length-1-idx})">
+【${item.date}】${item.title||"无标题"}｜标签：${item.tag||"无"}<br>
+<span class="tip-text">${(item.feel||"").substring(0,40)}…</span>
+</div>`
+    })
+    document.getElementById('record-list-wrap').innerHTML = html||"<div class='tip-text'>暂无完成归档记录</div>";
+}
+function recordSaveTag(){
+    const str = document.getElementById('record-tag-input').value.trim();
+    if(!str) return;
+    const arr = str.split(',').map(s=>s.trim()).filter(s=>s);
+    storageSet("recordTags",arr);
+    alert("自定义标签保存");
+    document.getElementById('record-tag-input').value="";
+    renderRecordList();
+}
+function recordNew(){
+    recEditId = null;
+    document.getElementById('record-date').valueAsDate = new Date();
+    document.getElementById('record-title').value="";
+    document.getElementById('record-feel').value="";
+    document.getElementById('record-tag-select').value="";
+    document.getElementById('record-edit-area').style.display="block";
+}
+function recordEdit(idx){
+    recEditId = idx;
+    const list = getRecordList();
+    const d = list[idx];
+    document.getElementById('record-date').value = d.date||"";
+    document.getElementById('record-title').value = d.title||"";
+    document.getElementById('record-feel').value = d.feel||"";
+    document.getElementById('record-tag-select').value = d.tag||"";
+    document.getElementById('record-edit-area').style.display="block";
+}
+function recordSave(){
+    const date = document.getElementById('record-date').value;
+    const title = document.getElementById('record-title').value.trim();
+    const tag = document.getElementById('record-tag-select').value;
+    const feel = document.getElementById('record-feel').value;
+    const arr = getRecordList();
+    if(recEditId===null){
+        arr.push({date,title,tag,feel})
+    }else{
+        arr[recEditId] = {date,title,tag,feel};
+    }
+    storageSet("recordList",arr);
+    alert("归档记录手动保存");
+    renderRecordList();
+}
+function recordCancel(){
+    document.getElementById('record-edit-area').style.display="none";
+}
+function recordDel(){
+    if(!confirm("确认删除归档记录，不可恢复")) return;
+    const arr = getRecordList();
+    if(recEditId!==null) arr.splice(recEditId,1);
+    storageSet("recordList",arr);
+    renderRecordList();
+}
+
+// ===================== Tab5 日历标记 + 八字离线简易计算 =====================
+function getCalEvent(){ return storageGet("calEventList")||[]; }
+function renderCalEvent(){
+    const evts = getCalEvent();
+    let html="";
+    evts.forEach((e,i)=>{
+        html += `<div class="list-item">${e.date}｜${e.text} <button class="btn-danger" onclick="calDel(${i})">删除</button></div>`
+    })
+    document.getElementById("cal-event-list").innerHTML = html||"<div class='tip-text'>暂无日历标记事件</div>";
+}
+function calAddEvent(){
+    const dt = document.getElementById("cal-date").value;
+    const txt = document.getElementById("cal-event").value.trim();
+    if(!dt||!txt){alert("请填写日期和事件");return;}
+    const arr = getCalEvent();
+    arr.push({date:dt, text:txt});
+    storageSet("calEventList",arr);
+    alert("日历事件保存");
+    renderCalEvent();
+    document.getElementById("cal-event").value="";
+}
+function calDel(idx){
+    const arr = getCalEvent();
+    arr.splice(idx,1);
+    storageSet("calEventList",arr);
+    renderCalEvent();
+}
+//简易八字离线计算（简化，前端本地运算，不联网）
+function calcBaZi(){
+    const birthVal = document.getElementById('bazi-birthday').value;
+    const hourIdx = parseInt(document.getElementById('bazi-hour').value);
+    if(!birthVal){
+        document.getElementById('bazi-result').innerText="请选择出生年月日";
+        return;
+    }
+    const birthDate = new Date(birthVal);
+    const dayZ = getDayGanZhi(birthDate);
+    const dayWx = WuXingMap[dayZ.gan];
+    const hourGanIdx = (Gan.indexOf(dayZ.gan)*2 + hourIdx )%10;
+    const hourGan = Gan[hourGanIdx];
+    const hourZhi = Zhi[hourIdx];
+    let resText = `
+日柱：${dayZ.gan}${dayZ.zhi} ｜日主五行：${dayWx}
+时柱：${hourGan}${hourZhi}｜时五行：${WuXingMap[hourGan]} ${WuXingMap[hourZhi]}
+【提示】本程序为前端简易离线推算，仅作查阅参考，不作专业命理工具。
+    `;
+    document.getElementById('bazi-result').innerText = resText;
+}
+
+//页面初始化
+window.onload = function(){
+    renderHome();
+    renderNoteList();
+    renderBill();
+    renderRecordList();
+    renderCalEvent();
+}
+</script>
+</body>
+</html>
